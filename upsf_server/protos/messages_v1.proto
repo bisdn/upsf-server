@@ -1,0 +1,305 @@
+/*
+
+WT-474 Messages Protocol Buffer Schema
+
+Copyright (c) 2017-2022, Broadband Forum
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following
+disclaimer in the documentation and/or other materials
+provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products
+derived from this software without specific prior written
+permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The above license is used as a license under copyright only.
+Please reference the Forum IPR Policy for patent licensing terms
+<https://www.broadband-forum.org/ipr-policy>.
+
+Any moral rights which are necessary to exercise under the above
+license grant are also deemed granted under this license.
+
+This protocol buffer definition is part of WT-474; see
+the WT itself for full legal notices.
+
+Approval Date:      TBD.
+Publication Date:   TBD.
+Reference           TBD.
+
+*/
+
+syntax = "proto3";
+package wt474_messages.v1;
+
+import "google/protobuf/timestamp.proto";
+
+/* Item provides one of multiple different item types
+ */
+ message Item {
+    oneof sssitem {
+       Shard shard = 1;
+       SessionContext session_context = 2 ;
+       NetworkConnection network_connection = 3 ;
+       ServiceGatewayUserPlane service_gateway_user_plane = 4;
+       TrafficSteeringFunction traffic_steering_function = 5;
+       ServiceGateway service_gateway = 6;
+    }
+ }
+
+/* DerivedStatus identifies the derived item-status of a subscriber session steering component.
+ */
+ enum DerivedState {
+   unknown  = 0; //Item state is unknown or undeterminable.
+   inactive = 1; //Item exists but cannot currently be used.
+   active   = 2; //Item is active and is correctly deployed in the network.
+   updating = 3; //Item exists, but requires action to be correctly deployed.
+   deleting = 4; //Item under deletion, added by bisdn, 20220905
+   deleted  = 5; //Item delete, added by bisdn, 20220905
+}
+
+/* MetaData is a general message that can optionally be added to proved data about an item
+ * It provides additional general info about the item itself
+ */
+ message MetaData {
+    string description = 1;
+    google.protobuf.Timestamp created = 2;
+    google.protobuf.Timestamp last_updated = 3;
+    DerivedState derived_state = 4;
+}
+
+/* Maintenance holds maintenance information relating to the item
+*/
+message Maintenance {
+   enum MaintenanceReq {
+      none              = 0; //The item has no maintenance required.
+      drain             = 1; //All dependent items should be moved away from this item
+      drain_and_delete  = 2; //All dependent items should be moved away from this item and it should then be auto-matically deleted
+   }
+   MaintenanceReq maintenance_req = 1;
+}
+
+/* ServiceGateway provides the data associated with a Service Gateway.
+*/
+message ServiceGateway{
+   string name = 1;
+   MetaData metadata = 2;
+}
+
+/* ServiceGatewayUserPlane provides the data associated with a SGUP.
+*/
+message ServiceGatewayUserPlane{
+   string name = 1;
+   string service_gateway_name = 2;
+   MetaData metadata = 3;
+   Maintenance maintenance = 4;
+
+   message Spec{
+      int32 max_session_count = 1;
+      int32 max_shards = 2;
+      repeated string supported_service_group = 3;
+      NetworkConnection.Spec.Endpoint default_endpoint = 4;
+   }
+   Spec spec = 5;
+
+   message Status{
+      int32 allocated_session_count = 1;
+      int32 allocated_shards = 2; //desired + current
+   }
+   Status status = 6;
+}
+
+/* TrafficSteeringFunction provides the data associated with a tsf.
+*/
+message TrafficSteeringFunction{
+   string name = 1;
+   MetaData metadata = 2;
+   message Spec{
+      NetworkConnection.Spec.Endpoint default_endpoint = 1;
+   }
+   Spec spec = 3;
+}
+
+/* Shard provides the data associated with a shard.
+ */
+message Shard{
+   string name = 1;
+   MetaData metadata = 2;
+
+   message Spec{
+      int32 max_session_count = 1;
+      string virtual_mac = 2;
+      message DesiredState{
+         string service_gateway_user_plane = 1;
+         repeated string network_connection = 3;
+      }
+      DesiredState desired_state = 3;
+      repeated string prefix = 99; //not in 474 contrib
+   }
+   Spec spec = 4 ;
+
+   message Status{
+      int32 allocated_session_count = 1;
+      int32 maximum_allocated_quality = 3; //not in 474 contrib
+      repeated string service_groups_supported = 4; //not in 474 contrib
+      message CurrentState{
+         string service_gateway_user_plane =1;
+         map<string, string> tsf_network_connection = 2;
+      }
+      CurrentState current_state = 2;
+   }
+   Status status = 5;
+
+   message Mbb{
+      enum MbbState {
+         non_mbb_move_requried = 0;
+         userplane_mbb_initiation_required = 1;
+         upstream_switchover_required = 2;
+         downstream_switchover_required = 3 ;
+         upstream_finalization_required = 4 ;
+         mbb_complete = 5;
+         mbb_failure = 999;
+      }
+      MbbState mbb_state = 1 ;
+   }
+   Mbb mbb = 6;
+}
+
+/* NetworkConnection provides the data associated with a nc.
+*/
+message NetworkConnection{
+   string name = 1;
+   MetaData metadata = 2;
+   Maintenance maintenance = 3;
+
+   message Spec{
+      int32 maximum_supported_quality = 1;
+
+      message Endpoint{
+         string endpoint_name = 1;
+         oneof transport_endpoint{
+            Vtep vtep = 2 ;
+            L2vpn l2vpn = 3 ;
+            PortVlan port_vlan = 4 ;
+         }
+      }
+
+      message SsPtpSpec {
+         repeated Endpoint sgup_endpoint = 1;
+         Endpoint tsf_endpoint = 2;
+      }
+
+      message SsMptpSpec {
+         repeated Endpoint sgup_endpoint = 1;
+         repeated Endpoint tsf_endpoint = 2;
+      }
+
+      message MsPtpSpec {
+         Endpoint sgup_endpoint = 1;
+         Endpoint tsf_endpoint = 2;
+      }
+
+      message MsMptpSpec {
+         Endpoint sgup_endpoint = 1;
+         repeated Endpoint tsf_endpoint = 2;
+      }
+
+      oneof nc_spec{
+         SsPtpSpec  ss_ptp  = 10;
+         SsMptpSpec ss_mptpc = 11;
+         MsPtpSpec  ms_ptp  = 12;
+         MsMptpSpec ms_mptp = 13;
+      }
+
+   }
+   Spec spec = 4;
+
+   message Status{
+      map<string, bool> nc_active = 1;
+      int32 allocated_shards = 2; //desired + current
+   }
+   Status status = 20;
+}
+
+/* SessionContext provides the data associated with a sessioncontext.
+*/
+message SessionContext{
+   string name = 1;
+   MetaData metadata = 2;
+
+   message Spec {
+      string traffic_steering_function = 1;
+      repeated string required_service_group = 2;
+//      string required_quality = 3;
+      int32 required_quality = 3;
+      string circuit_id = 4;
+      string remote_id = 5;
+      SessionFilter session_filter = 6;
+      message DesiredState{
+         string shard = 1;
+      }
+      DesiredState desired_state = 7;
+      string network_connection = 8; //not in 474 yet
+   }
+   Spec spec = 3;
+
+   message Status{
+      message CurrentState{
+         string user_plane_shard = 1;
+         string tsf_shard = 2;
+      }
+      CurrentState current_state = 1;
+   }
+   Status status = 4;
+
+}
+
+/* SessionFilter is a a filter that can be used to identify a subscriber.
+ It defines the filter as the packet would be received at the User Plane
+ excluding any headers related to the network connections
+ */
+ message SessionFilter{
+   string source_mac_address = 1;
+   int32 svlan = 2;
+   int32 cvlan = 3;
+}
+
+/* Network Connection Transport endpoint types
+*/
+message L2vpn {
+   int32 vpn_id = 1 ;
+}
+
+message PortVlan {
+   string logical_port = 1;
+   int32 svlan = 2;
+   int32 cvlan = 3;
+}
+
+message Vtep {
+   string ip_address = 1;
+   int32 udp_port = 2;
+   int32 vni = 3 ;
+}

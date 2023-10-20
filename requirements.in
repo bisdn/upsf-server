@@ -1,0 +1,23 @@
+# This is the source file for requirements.txt.
+# The docs on how to use pip-compile can be found here:
+# https://github.com/jazzband/pip-tools
+
+# To work with requirements.in, install pip-tools:
+# $ pip install pip-tools
+#
+# To update a specific package (and dependencies as necessary):
+# $ pip-compile --upgrade-package ansible
+#
+# To update all packages:
+# $ pip-compile --upgrade
+
+redis
+grpcio
+grpcio-tools
+ipaddress
+pre-commit
+pylint
+flake8
+bandit
+black
+codespell

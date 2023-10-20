@@ -1,0 +1,105 @@
+/*
+WT-474 UPSF Service Protocol Buffer Schema
+
+Copyright (c) 2017-2022, Broadband Forum
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following
+disclaimer in the documentation and/or other materials
+provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products
+derived from this software without specific prior written
+permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The above license is used as a license under copyright only.
+Please reference the Forum IPR Policy for patent licensing terms
+<https://www.broadband-forum.org/ipr-policy>.
+
+Any moral rights which are necessary to exercise under the above
+license grant are also deemed granted under this license.
+
+This protocol buffer definition is part of WT-474; see
+the WT itself for full legal notices.
+
+Approval Date:      TBD.
+Publication Date:   TBD.
+Reference           TBD.
+*/
+
+syntax = "proto3";
+package wt474_upsf_service.v1;
+
+import "upsf_server/protos/messages_v1.proto";
+import "google/protobuf/wrappers.proto";
+
+// sssUpsf provides a set of services that will be exposed by the UPSF.
+service upsf {
+   rpc CreateV1 (wt474_messages.v1.Item) returns (wt474_messages.v1.Item) {}
+   rpc ReadV1 (ReadReq) returns (stream wt474_messages.v1.Item) {}
+   rpc UpdateV1 (UpdateReq) returns (wt474_messages.v1.Item) {}
+   rpc DeleteV1 (google.protobuf.StringValue) returns (google.protobuf.StringValue) {}
+   rpc LookupV1 (wt474_messages.v1.SessionContext.Spec) returns (wt474_messages.v1.SessionContext) {}
+}
+
+// UpdateReq includes the item to be updated along with update options.
+message UpdateReq {
+   wt474_messages.v1.Item item = 1;
+   message UpdateOptions {
+      enum ListMergeStrategy {
+         union = 0;
+         replace = 1;
+         subtract = 2;
+      }
+      ListMergeStrategy list_merge_strategy = 1;
+   }
+   UpdateOptions update_options = 2 ;
+}
+
+// ItemType identifies a session steering item type
+ enum ItemType {
+   service_gateway = 0;
+   service_gateway_user_plane = 1;
+   traffic_steering_function = 2;
+   network_connection = 3 ;
+   shard = 4 ;
+   session_context = 5 ;
+}
+
+/* ReadReq allows one or more items to be retrieved.
+ All items of one type can be retrieved by omitting the parent
+ A single item of itemtype can be retrieved by specifying the itemname as parentname
+ Otherwise, all items of a defined type recursively 'under' the parent will be returned
+ This includes where an item is 'under' the parent through a desired or current field.
+ When the 'watch' flag is not set, the stream will close after all current items matching the request have been sent.
+ When the 'watch' flag is set, the stream will remain open to send any further changes to any items matching the request.
+ */
+message ReadReq {
+   repeated ItemType itemtype = 1;
+   repeated wt474_messages.v1.DerivedState itemstate = 2;
+   repeated google.protobuf.StringValue parent = 3 ;
+   repeated google.protobuf.StringValue name = 4 ;
+   bool watch = 5 ;
+}
