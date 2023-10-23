@@ -679,6 +679,7 @@ class SssUpsfServicer(service_v1_pb2_grpc.upsfServicer):
                                 "name": command_dict["name"],
                             }
                         )
+                        rconn.publish("UpdatesEgress", command)
                         continue
 
                     mapping = rconn.hgetall(_redis_key_ingress)
